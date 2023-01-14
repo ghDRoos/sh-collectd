@@ -1,0 +1,249 @@
+#!/bin/bash
+#!/usr/bin/env bash
+###################
+# Notes:
+#   Plugin  Commandline                   Arg1 (hostname)   Arg2 (datasource)       Debug (0|1)
+#   ------- ----------------------------- ----------------  ----------------------- ------------
+#      Exec "/usr/local/bin/net2collectd" "P1DSMR"          "localhost:2000" "0"
+#      Exec "/usr/local/bin/net2collectd" "P1WARMTE"        "localhost:2001" "1"
+
+function putval() {
+    MSG=$( printf "PUTVAL %s/%s interval=%s %s:%s" "$COLLECTHOST" "$1" "$INTERVAL" "${3:-$TIMESTAMP}" "$2" )
+    if [ "$DEBUG" != "0" ]; then
+        logger -p user.info -t NET2COLLECTD "[N2C] $MSG"
+    fi
+    printf "%s\n" "$MSG"
+}
+
+function obists_to_epoch() {
+    # Hardcoded 21st century
+    D="20${1%?}"
+    TIMESTAMP=`date -d "${D:0:8} ${D:8:2}:${D:10:2}:${D:12:2}" +%s`
+    echo $TIMESTAMP
+}
+
+function sanitize_number() {
+    echo "$1" | bc | awk '{printf "%.3f", $0}'
+}
+
+function parse_obis() {
+    case "$1" in
+         "0-0:1.0.0")
+            # Sample: 0-0:1.0.0(221012193527W)
+            #    Timestamp: YYMMDDhhmmssX
+            OBISVAL=$( echo $2 | sed -e 's/[^()]*(\([^)]*\))[^()]*/\1/g'  )
+            obists_to_epoch ${OBISVAL} 1>/dev/null
+            ;;
+        "1-0:1.8.1")
+            # Subject: Meter Reading electricity delivered to client (low tariff) in 0,001 kWh
+            # Sample: 1-0:1.8.1(000006.122*kWh)
+            # Type: energy_wh               value:GAUGE:U:U
+            RRDGROUP="electricty"
+            RRDTYPE="energy_wh"
+            RRDSUBJ="used_low"
+            OBISVAL=$( echo $2 | sed -e 's/[^()]*(\([^)]*\))[^()]*/\1/g'  )
+            PVDATA=$( printf "%s/%s-%s" "$RRDGROUP" "$RRDTYPE" "$RRDSUBJ" )
+            putval "$PVDATA" "`sanitize_number \"${OBISVAL%\**}\"`"
+            ;;
+        "1-0:1.8.2")
+            # Subject: Meter Reading electricity delivered to client (normal tariff) in 0,001 kWh
+            # Sample: 1-0:1.8.2(000005.411*kWh)
+            # Type: energy_wh               value:GAUGE:U:U
+            RRDGROUP="electricty"
+            RRDTYPE="energy_wh"
+            RRDSUBJ="used_normal"
+            OBISVAL=$( echo $2 | sed -e 's/[^()]*(\([^)]*\))[^()]*/\1/g'  )
+            PVDATA=$( printf "%s/%s-%s" "$RRDGROUP" "$RRDTYPE" "$RRDSUBJ" )
+            putval "$PVDATA" "`sanitize_number \"${OBISVAL%\**}\"`"
+            ;;
+        "1-0:2.8.1")
+            # Subject: Meter Reading electricity delivered by client (low tariff) in 0,001 kWh
+            # Sample: 1-0:2.8.1(000000.000*kWh)
+            # Type: energy_wh               value:GAUGE:U:U
+            RRDGROUP="electricty"
+            RRDTYPE="energy_wh"
+            RRDSUBJ="delivered_low"
+            OBISVAL=$( echo $2 | sed -e 's/[^()]*(\([^)]*\))[^()]*/\1/g'  )
+            PVDATA=$( printf "%s/%s-%s" "$RRDGROUP" "$RRDTYPE" "$RRDSUBJ" )
+            putval "$PVDATA" "`sanitize_number \"${OBISVAL%\**}\"`"
+            ;;
+        "1-0:2.8.2")
+            # Subject: Meter Reading electricity delivered by client (normal tariff) in 0,001 kWh
+            # Sample: 1-0:2.8.2(000000.000*kWh)
+            # Type: energy_wh               value:GAUGE:U:U
+            RRDGROUP="electricty"
+            RRDTYPE="energy_wh"
+            RRDSUBJ="delivered_normal"
+            OBISVAL=$( echo $2 | sed -e 's/[^()]*(\([^)]*\))[^()]*/\1/g'  )
+            PVDATA=$( printf "%s/%s-%s" "$RRDGROUP" "$RRDTYPE" "$RRDSUBJ" )
+            putval "$PVDATA" "`sanitize_number \"${OBISVAL%\**}\"`"
+            ;;
+        "1-0:1.7.0")
+            # Subject: Actual electricity power delivered (+P) in 1 Watt resolution
+            # Sample: 1-0:1.7.0(01.006*kW)
+            # Type: power                   value:GAUGE:U:U
+            RRDGROUP="electricty"
+            RRDTYPE="power"
+            RRDSUBJ="used"
+            OBISVAL=$( echo $2 | sed -e 's/[^()]*(\([^)]*\))[^()]*/\1/g'  )
+            PVDATA=$( printf "%s/%s-%s" "$RRDGROUP" "$RRDTYPE" "$RRDSUBJ" )
+            putval "$PVDATA" "`sanitize_number \"${OBISVAL%\**}\"`"
+            ;;
+        "1-0:2.7.0")
+            # Subject: Actual electricity power received (-P) in 1 Watt resolution
+            # Sample: 1-0:2.7.0(00.000*kW)
+            # Type: power                   value:GAUGE:U:U
+            RRDGROUP="electricty"
+            RRDTYPE="power"
+            RRDSUBJ="delivered"
+            OBISVAL=$( echo $2 | sed -e 's/[^()]*(\([^)]*\))[^()]*/\1/g'  )
+            PVDATA=$( printf "%s/%s-%s" "$RRDGROUP" "$RRDTYPE" "$RRDSUBJ" )
+            putval "$PVDATA" "`sanitize_number \"${OBISVAL%\**}\"`"
+            ;;
+        "0-0:96.7.21")
+            # Subject: Number of power failures in any phases
+            # Sample: 0-0:96.7.21(00007)
+            # Type: errors                  value:DERIVE:0:U
+            RRDGROUP="power"
+            RRDTYPE="errors"
+            RRDSUBJ="power_fail"
+            OBISVAL=$( echo $2 | sed -e 's/[^()]*(\([^)]*\))[^()]*/\1/g'  )
+            PVDATA=$( printf "%s/%s-%s" "$RRDGROUP" "$RRDTYPE" "$RRDSUBJ" )
+            putval "$PVDATA" "`sanitize_number \"${OBISVAL%\**}\"`"
+            ;;
+        "0-0:96.7.9")
+            # Subject: Number of long power failures in any phases
+            # Sample: 0-0:96.7.9(00004)
+            # Type: errors                  value:DERIVE:0:U
+            RRDGROUP="power"
+            RRDTYPE="errors"
+            RRDSUBJ="power_longfail"
+            OBISVAL=$( echo $2 | sed -e 's/[^()]*(\([^)]*\))[^()]*/\1/g'  )
+            PVDATA=$( printf "%s/%s-%s" "$RRDGROUP" "$RRDTYPE" "$RRDSUBJ" )
+            putval "$PVDATA" "`sanitize_number \"${OBISVAL%\**}\"`"
+            ;;
+        "1-0:32.32.0")
+            # Subject: Number of voltage sags in phase L1
+            # Sample: 1-0:32.32.0(00011)
+            # Type: errors                  value:DERIVE:0:U
+            RRDGROUP="voltage"
+            RRDTYPE="errors"
+            RRDSUBJ="L1_sags"
+            OBISVAL=$( echo $2 | sed -e 's/[^()]*(\([^)]*\))[^()]*/\1/g'  )
+            PVDATA=$( printf "%s/%s-%s" "$RRDGROUP" "$RRDTYPE" "$RRDSUBJ" )
+            putval "$PVDATA" "`sanitize_number \"${OBISVAL%\**}\"`"
+            ;;
+        "1-0:32.36.0")
+            # Subject: Number of voltage swells in phase L1
+            # Sample: 1-0:32.36.0(00011)
+            # Type: errors                  value:DERIVE:0:U
+            RRDGROUP="voltage"
+            RRDTYPE="errors"
+            RRDSUBJ="L1_swells"
+            OBISVAL=$( echo $2 | sed -e 's/[^()]*(\([^)]*\))[^()]*/\1/g'  )
+            PVDATA=$( printf "%s/%s-%s" "$RRDGROUP" "$RRDTYPE" "$RRDSUBJ" )
+            putval "$PVDATA" "`sanitize_number \"${OBISVAL%\**}\"`"
+            ;;
+        "1-0:32.7.0")
+            # Subject: Instantaneous voltage L1
+            # Sample: 1-0:32.7.0(227.0*V)
+            # Type: voltage                 value:GAUGE:U:U
+            RRDGROUP="L1"
+            RRDTYPE="voltage"
+            RRDSUBJ="Instantaneous"
+            OBISVAL=$( echo $2 | sed -e 's/[^()]*(\([^)]*\))[^()]*/\1/g'  )
+            PVDATA=$( printf "%s/%s-%s" "$RRDGROUP" "$RRDTYPE" "$RRDSUBJ" )
+            putval "$PVDATA" "`sanitize_number \"${OBISVAL%\**}\"`"
+            ;;
+        "1-0:31.7.0")
+            # Subject: Instantaneous current L1
+            # Sample: 1-0:31.7.0(006*A)
+            # Type: current                 value:GAUGE:U:U
+            RRDGROUP="L1"
+            RRDTYPE="current"
+            RRDSUBJ="Instantaneous"
+            OBISVAL=$( echo $2 | sed -e 's/[^()]*(\([^)]*\))[^()]*/\1/g'  )
+            PVDATA=$( printf "%s/%s-%s" "$RRDGROUP" "$RRDTYPE" "$RRDSUBJ" )
+            putval "$PVDATA" "`sanitize_number \"${OBISVAL%\**}\"`"
+            ;;
+        "1-0:21.7.0")
+            # Subject: Instantaneous active power L1 (+P)
+            # Sample: 1-0:21.7.0(01.005*kW)
+            # Type: power                   value:GAUGE:U:U
+            RRDGROUP="L1"
+            RRDTYPE="power"
+            RRDSUBJ="Instantaneous_used"
+            OBISVAL=$( echo $2 | sed -e 's/[^()]*(\([^)]*\))[^()]*/\1/g'  )
+            PVDATA=$( printf "%s/%s-%s" "$RRDGROUP" "$RRDTYPE" "$RRDSUBJ" )
+            putval "$PVDATA" "`sanitize_number \"${OBISVAL%\**}\"`"
+            ;;
+        "1-0:22.7.0")
+            # Subject: Instantaneous active power L1 (-P)
+            # Sample: 1-0:22.7.0(01.005*kW)
+            # Type: power                   value:GAUGE:U:U
+            RRDGROUP="L1"
+            RRDTYPE="power"
+            RRDSUBJ="Instantaneous_delivered"
+            OBISVAL=$( echo $2 | sed -e 's/[^()]*(\([^)]*\))[^()]*/\1/g'  )
+            PVDATA=$( printf "%s/%s-%s" "$RRDGROUP" "$RRDTYPE" "$RRDSUBJ" )
+            putval "$PVDATA" "`sanitize_number \"${OBISVAL%\**}\"`"
+            ;;
+        *":24.2.1")
+            # Subject: Last 5-minute Meter reading Heat or Cold in 0,01 GJ and capture time
+            # Sample: 0-1:24.2.1(221012201317W)(00.078*GJ)
+            # Type: energy                 value:GAUGE:U:U
+            RRDGROUP="heat"
+            RRDTYPE="energy"
+            RRDSUBJ="last5m_GJ"
+            OBISVAL=$( echo $2 | sed -e 's/[^()]*(\([^)]*\))[^()]*/\1,/g'  )
+            PVDATA=$( printf "%s/%s-%s" "$RRDGROUP" "$RRDTYPE" "$RRDSUBJ" )
+            while IFS=, read -r OBISTS OBIS5M dummy ; do
+                putval "$PVDATA" "`sanitize_number \"${OBIS5M%\**}\"`"
+            done < <( echo $OBISVAL)
+            ;;
+    esac
+}
+
+COLLECTHOST="$1"
+SERHOST=${2%:*}
+SERPORT=${2##*:}
+
+INTERVAL="${COLLECTD_INTERVAL:-30}"
+INTERVAL=$( printf "%.0f" $INTERVAL )
+let TIMEOUT=$(( INTERVAL / 2 ))
+TIMESTAMP=$( date +%s )
+DEBUG=${3:-0}
+
+if [ "$DEBUG" != "0" ]; then
+    MSG=$( printf "Connecting to %s:%s.\n  Interval: %d\n  Timeout: %d\n\n" "${SERHOST}" "${SERPORT}" "${INTERVAL}" "${TIMEOUT}" )
+    logger -p user.info -t NET2COLLECTD "[N2C] $MSG"
+fi
+
+# Main loop
+while sleep "$INTERVAL"; do
+    if [ "$DEBUG" != "0" ]; then
+        MSG="Entering main loop at $TIMESTAMP seconds since epoch."
+        logger -p user.info -t NET2COLLECTD "[N2C] $MSG"
+    fi
+
+    # Read loop
+    while IFS= read -r line; do
+        case $line in
+            !*)
+                CHKSUM=${line#!*}
+                break
+                ;;
+            [0-9]*)
+                TIMESTAMP=$( date +%s )
+                if [ "$DEBUG" != "0" ]; then
+                    MSG="Obtaining data at $TIMESTAMP seconds since epoch."
+                    logger -p user.info -t NET2COLLECTD "[N2C] $MSG"
+                fi
+                DSMROBIS="${line%%(*}"
+                DSMRVALUE="${line##$DSMROBIS}"
+                DSMRVALUE="${DSMRVALUE//[$'\t\r\n ']}"
+                parse_obis "$DSMROBIS" "$DSMRVALUE" 
+                ;;
+        esac
+    done < <( timeout ${TIMEOUT} nc -d ${SERHOST} ${SERPORT} )
+done

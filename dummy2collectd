@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+###################
+#
+##  !! For debug purposes only !!
+#
+# Notes:
+#   Exec "/usr/local/bin/net2collectd" "P1DSMR" "localhost:2000"
+#   Exec "/usr/local/bin/net2collectd" "P1WARMTE" "localhost:2001"
+
+function sanitize_number() {
+    echo "$1" | bc | awk '{printf "%.3f", $0}'
+}
+
+HOSTNAME="$1"
+SERHOST=${2%:*}
+SERPORT=${2##*:}
+
+INTERVAL="${COLLECTD_INTERVAL:-10}"
+INTERVAL=$( printf "%.0f" $INTERVAL )
+let TIMEOUT=$(( INTERVAL / 2 ))
+TIMESTAMP=""
+
+# Main loop
+while sleep "$INTERVAL"; do
+    TIMESTAMP=$( date +%s )
+
+    let NUM=$( shuf -i 1-10 -n 1)   # Random number between 1-10
+    OBISVAL="$NUM.000"
+    putval "p1power/power-received" "`sanitize_number \"${OBISVAL%\**}\"`"
+
+    let NUM=$( shuf -i 1-10 -n 1)   # Random number between 1-10
+    OBISVAL="$NUM"
+    putval "p1power/power-failures_short" "`sanitize_number \"${OBISVAL%\**}\"`"
+done

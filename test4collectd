@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+
+function putval() {
+    MSG=$( printf "PUTVAL %s/%s interval=%s %s:%s" "$COLLECTHOST" "$1" "$INTERVAL" "${3:-$TIMESTAMP}" "$2" )
+    if [ "$DEBUG" != "0" ]; then
+        logger -p user.info -t NET2COLLECTD "[N2C] $MSG"
+    fi
+    printf "%s\n" "$MSG"
+}
+
+function obists_to_epoch() {
+    # Hardcoded 21st century
+    D="20${1%?}"
+    TIMESTAMP=`date -d "${D:0:8} ${D:8:2}:${D:10:2}:${D:12:2}" +%s`
+    echo $TIMESTAMP
+}
+
+function sanitize_number() {
+    echo "$1" | bc | awk '{printf "%.3f", $0}'
+}
+
+function parse_obis() {
+    case "$1" in
+         "0-0:1.0.0")
+            # Sample: 0-0:1.0.0(221012193527W)
+            #    Timestamp: YYMMDDhhmmssX
+            OBISVAL=$( echo $2 | sed -e 's/[^()]*(\([^)]*\))[^()]*/\1/g'  )
+            obists_to_epoch ${OBISVAL} 1>/dev/null
+            ;;
+        "1-0:1.8.1")
+            # Subject: Meter Reading electricity delivered to client (low tariff) in 0,001 kWh
+            # Sample: 1-0:1.8.1(000006.122*kWh)
+            # Type: energy_wh               value:GAUGE:U:U
+            RRDGROUP="electricty"
+            RRDTYPE="energy_wh"
+            RRDSUBJ="used_low"
+            OBISVAL=$( echo $2 | sed -e 's/[^()]*(\([^)]*\))[^()]*/\1/g'  )
+            PVDATA=$( printf "%s/%s-%s" "$RRDGROUP" "$RRDTYPE" "$RRDSUBJ" )
+            putval "$PVDATA" "`sanitize_number \"${OBISVAL%\**}\"`"
+            ;;
+    esac
+}
+
+function do_debug() {
+    if [ "$DEBUG" != "0" ]; then
+        logger -s -p user.info -t TEST4COLLECTD "[T4C] $1"
+    fi
+}
+
+# Settings
+COLLECTHOST="$1"
+INTERVAL="${COLLECTD_INTERVAL:-10}"
+INTERVAL=$( printf "%.0f" $INTERVAL )
+let TIMEOUT=$(( INTERVAL / 2 ))
+TIMEOUT=2
+TIMESTAMP=$( date +%s )
+DEBUG=${3:-0}
+
+SERHOST=${2%:*}
+SERPORT=${2##*:}
+
+if [ "$DEBUG" != "0" ]; then
+    MSG=$(printf "[DEBUG] %s: Connecting to %s on port %s.\n  Interval: %d\n  Timeout: %d\n\n" "${COLLECTHOST}" "${SERHOST}" "${SERPORT}" "${INTERVAL}" "${TIMEOUT}")
+    do_debug "$MSG"
+fi
+
+# Main loop
+while sleep "$INTERVAL"; do
+    if [ "$DEBUG" != "0" ]; then
+        MSG=$( printf "[DEBUG] Entering main loop at %s seconds since epoch." "$TIMESTAMP" )
+        do_debug "$MSG"
+    fi
+
+    # Read loop
+    while IFS= read -r line; do
+        TIMESTAMP=$( date +%s )
+        if [ "$DEBUG" != "0" ]; then
+            MSG=$( printf "[DEBUG] Entering sub shell read loop at %s seconds since epoch." "$TIMESTAMP" )
+            do_debug "$MSG"
+            MSG=$( printf "[DEBUG] Data was obtained! (Line: %s)" "$line" )
+            do_debug "$MSG"
+        fi
+        
+        case $line in
+            !*)
+                CHKSUM=${line#!*}
+                break
+                ;;
+            [0-9]*)
+                TIMESTAMP=$( date +%s )
+                printf "[DEBUG] Obtaining P1 data at %s seconds since epoch.\n" "$TIMESTAMP"
+                DSMROBIS="${line%%(*}"
+                DSMRVALUE="${line##$DSMROBIS}"
+                DSMRVALUE="${DSMRVALUE//[$'\t\r\n ']}"
+                parse_obis "$DSMROBIS" "$DSMRVALUE" 
+                ;;
+        esac
+    done < <(
+                timeout -v ${TIMEOUT} nc -d ${SERHOST} ${SERPORT} || echo "[DEBUG] Failed to read data from netcat!"
+                echo "EXIT: $?" 
+            )
+
+    if [ "$DEBUG" != "0" ]; then
+        TIMESTAMP=$( date +%s )
+        MSG=$( printf "[DEBUG] Completed main loop at %s seconds since epoch." "$TIMESTAMP" )
+        do_debug "$MSG"
+    fi
+done
