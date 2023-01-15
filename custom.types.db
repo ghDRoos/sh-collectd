@@ -1,0 +1,2 @@
+# plugin Exec:net2collectd
+power_errors                    value:GAUGE:U:U
