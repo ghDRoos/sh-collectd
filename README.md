@@ -47,6 +47,20 @@ Add the following to `/etc/collectd/collectd.conf.d/exec.conf`:
 ```
   **!!** Change hostnames (*P1DSMR*, *P1WarmteNet*) to your own standards as these will show up in your rrd basedir. Also change the *smartmeter.iot.lan:port* to the hostname ans port where your `ser2net` daemon reside. Ofcourse, they can be different hosts if you use more than one.
 
+Add the below custom type to your `custom.types.db`:
+```
+# plugin Exec:net2collectd
+power_errors                    value:GAUGE:U:U
+```
+
+  **!!** Check where your `custom.db` file resides in your `collectd.conf` file:
+```
+grep -i TypesDB /etc/collectd.conf
+TypesDB "/usr/share/collectd/types.db"
+TypesDB "/etc/collectd/custom.types.db"
+```
+If there is no TypesDB line in your config, manually add it (`collectd -h` outputs your data directory where the default `types.db` file resides. Do not forget to add that too!)
+
 Restart collectd
 ```
 service collectd restart
@@ -58,4 +72,3 @@ Fix any errors you see.
 ### Possible issues
 
 The busybox netcat is too limited for use in non-interactive scripts. Install a full version (ie: `apk add netcat-openbsd` for Alpine Linux).
-
