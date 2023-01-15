@@ -23,7 +23,14 @@ function obists_to_epoch() {
 }
 
 function sanitize_number() {
-    echo "$1" | bc | awk '{printf "%.3f", $0}'
+    FLOAT=$( echo "$1" | bc | awk '{printf "%.3f", $0}' )
+    if [ "${1%%.*}" == "$1" ]; then
+        # Integer value
+        echo ${FLOAT%%.*}
+    else
+        # Float value
+        echo ${FLOAT}
+    fi
 }
 
 function parse_obis() {
@@ -103,9 +110,9 @@ function parse_obis() {
         "0-0:96.7.21")
             # Subject: Number of power failures in any phases
             # Sample: 0-0:96.7.21(00007)
-            # Type: errors                  value:DERIVE:0:U
+            # Type: power_errors            value:GAUGE:0:U
             RRDGROUP="power"
-            RRDTYPE="errors"
+            RRDTYPE="power_errors"
             RRDSUBJ="power_fail"
             OBISVAL=$( echo $2 | sed -e 's/[^()]*(\([^)]*\))[^()]*/\1/g'  )
             PVDATA=$( printf "%s/%s-%s" "$RRDGROUP" "$RRDTYPE" "$RRDSUBJ" )
@@ -114,9 +121,9 @@ function parse_obis() {
         "0-0:96.7.9")
             # Subject: Number of long power failures in any phases
             # Sample: 0-0:96.7.9(00004)
-            # Type: errors                  value:DERIVE:0:U
+            # Type: power_errors            value:GAUGE:0:U
             RRDGROUP="power"
-            RRDTYPE="errors"
+            RRDTYPE="power_errors"
             RRDSUBJ="power_longfail"
             OBISVAL=$( echo $2 | sed -e 's/[^()]*(\([^)]*\))[^()]*/\1/g'  )
             PVDATA=$( printf "%s/%s-%s" "$RRDGROUP" "$RRDTYPE" "$RRDSUBJ" )
@@ -125,9 +132,9 @@ function parse_obis() {
         "1-0:32.32.0")
             # Subject: Number of voltage sags in phase L1
             # Sample: 1-0:32.32.0(00011)
-            # Type: errors                  value:DERIVE:0:U
+            # Type: power_errors            value:GAUGE:0:U
             RRDGROUP="voltage"
-            RRDTYPE="errors"
+            RRDTYPE="power_errors"
             RRDSUBJ="L1_sags"
             OBISVAL=$( echo $2 | sed -e 's/[^()]*(\([^)]*\))[^()]*/\1/g'  )
             PVDATA=$( printf "%s/%s-%s" "$RRDGROUP" "$RRDTYPE" "$RRDSUBJ" )
@@ -136,9 +143,9 @@ function parse_obis() {
         "1-0:32.36.0")
             # Subject: Number of voltage swells in phase L1
             # Sample: 1-0:32.36.0(00011)
-            # Type: errors                  value:DERIVE:0:U
+            # Type: power_errors            value:GAUGE:0:U
             RRDGROUP="voltage"
-            RRDTYPE="errors"
+            RRDTYPE="power_errors"
             RRDSUBJ="L1_swells"
             OBISVAL=$( echo $2 | sed -e 's/[^()]*(\([^)]*\))[^()]*/\1/g'  )
             PVDATA=$( printf "%s/%s-%s" "$RRDGROUP" "$RRDTYPE" "$RRDSUBJ" )
