@@ -2,20 +2,6 @@
 
 A set of shell scripts that can be used with the [Collectd](http://collectd.org)([Collectd on github](https://github.com/collectd/collectd)) Exec plugin
 
-## Enable Exec plugin
-
- **!!** Creates a new file / Overwrites excisting file **!!**
-```
-cat <EOF> /etc/collectd/collectd.conf.d/exec.conf
-# Note: Config must end with a BLANK line!
-LoadPlugin exec
-<Plugin exec>
-    Exec "collectd" "/usr/local/bin/net2collectd" "P1DSMR" "smartmeter.iot.lan:2000"
-    Exec "collectd" "/usr/local/bin/net2collectd" "P1WarmteNet" "smartmeter.iot.lan:2001"
-</Plugin>
-
-```
-
 ## net2collectd
 
 A shell script that takes the output of a P1 connection via [ser2net](https://github.com/cminyard/ser2net) and converts it to the collectd [plain text protocol](https://collectd.org/wiki/index.php/Plain_text_protocol).
@@ -47,6 +33,18 @@ Add the following to `/etc/collectd/collectd.conf.d/exec.conf`:
     Exec "collectd" "/usr/local/bin/net2collectd" "P1WarmteNet" "smartmeter.iot.lan:2001"
 </Plugin>
 ```
+Or create a new file (**!!** Creates a new file / Overwrites excisting file **!!**)
+```
+cat <EOF> /etc/collectd/collectd.conf.d/exec.conf
+# Note: Config must end with a BLANK line!
+LoadPlugin exec
+<Plugin exec>
+    Exec "collectd" "/usr/local/bin/net2collectd" "P1DSMR" "smartmeter.iot.lan:2000"
+    Exec "collectd" "/usr/local/bin/net2collectd" "P1WarmteNet" "smartmeter.iot.lan:2001"
+</Plugin>
+
+```
+
   **!!** Change hostnames (*P1DSMR*, *P1WarmteNet*) to your own standards as these will show up in your rrd basedir. Also change the *smartmeter.iot.lan:port* to the hostname and port(s) where your `ser2net` daemon resides. Ofcourse, they can be different hosts if you use more than one host to connect to your smart meters.
 
 Add this custom type to your `custom.types.db`:
