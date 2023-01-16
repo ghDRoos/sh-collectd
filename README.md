@@ -1,9 +1,10 @@
 # Collectd Shell Scripts
 
-A set of shell scripts that can be used with the [Collectd](http://collectd.org)/[Collectd on github](https://github.com/collectd/collectd) Exec plugin
+A set of shell scripts that can be used with the [Collectd](http://collectd.org)([Collectd on github](https://github.com/collectd/collectd)) Exec plugin
 
 ## Enable Exec plugin
 
+ **!!** Creates a new file / Overwrites excisting file **!!**
 ```
 cat <EOF> /etc/collectd/collectd.conf.d/exec.conf
 # Note: Config must end with a BLANK line!
@@ -17,12 +18,13 @@ LoadPlugin exec
 
 ## net2collectd
 
-A script that takes the output of a P1 connection via [ser2net](https://github.com/cminyard/ser2net) and converts it to the collectd test protocol.
+A shell script that takes the output of a P1 connection via [ser2net](https://github.com/cminyard/ser2net) and converts it to the collectd [plain text protocol](https://collectd.org/wiki/index.php/Plain_text_protocol).
 
 ### Requirements
 
-You need to setup the ser2net daemon on a system that has the P1 connection(s) to your smart meter(s).
-Packages/Applications needed:
+NOTE: You need to setup the ser2net daemon on a system that has the P1 connection(s) to your smart meter(s).
+
+Packages/Applications needed by script:
 ```
 bc
 nc
@@ -31,9 +33,9 @@ For *netcat*(nc), check the [Possible issues](#possible-issues) section below.
 
 ### Install
 
-Clone the repo and copy the net2collectd script to `/usr/local/bin/`:
+Clone the repo and copy the `net2collectd` script to `/usr/local/bin/`:
 ```
-git clone 
+git clone https://github.com/ghDRoos/sh-collectd.git
 sudo cp sh-collectd/net2collectd /usr/local/bin
 sudo chmod 755 /usr/local/bin/net2collectd
 ```
@@ -45,9 +47,9 @@ Add the following to `/etc/collectd/collectd.conf.d/exec.conf`:
     Exec "collectd" "/usr/local/bin/net2collectd" "P1WarmteNet" "smartmeter.iot.lan:2001"
 </Plugin>
 ```
-  **!!** Change hostnames (*P1DSMR*, *P1WarmteNet*) to your own standards as these will show up in your rrd basedir. Also change the *smartmeter.iot.lan:port* to the hostname ans port where your `ser2net` daemon reside. Ofcourse, they can be different hosts if you use more than one.
+  **!!** Change hostnames (*P1DSMR*, *P1WarmteNet*) to your own standards as these will show up in your rrd basedir. Also change the *smartmeter.iot.lan:port* to the hostname and port(s) where your `ser2net` daemon resides. Ofcourse, they can be different hosts if you use more than one host to connect to your smart meters.
 
-Add the below custom type to your `custom.types.db`:
+Add this custom type to your `custom.types.db`:
 ```
 # plugin Exec:net2collectd
 power_errors                    value:GAUGE:U:U
@@ -71,4 +73,4 @@ Fix any errors you see.
 
 ### Possible issues
 
-The busybox netcat is too limited for use in non-interactive scripts. Install a full version (ie: `apk add netcat-openbsd` for Alpine Linux).
+The busybox netcat is too limited for use in non-interactive scripts (does not output anything). Install a full version (ie: `apk add netcat-openbsd` for Alpine Linux).
